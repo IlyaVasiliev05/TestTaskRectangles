@@ -37,7 +37,7 @@ public class RectangleManager : MonoBehaviour {
 
 	void Update()
 	{
-		currentCursorPosition = CursorPositionToWorld(cam.ScreenToWorldPoint(Input.mousePosition)); // Преобразуем позицию курсора в Vector2 в мировых координатах
+		currentCursorPosition = (Vector2)(cam.ScreenToWorldPoint(Input.mousePosition)); // Преобразуем позицию курсора в Vector2 в мировых координатах
 
 		ManageCursor(currentCursorPosition); // Визуальная мешура к курсору
         CheckMouseOnLink(); // 
@@ -77,20 +77,22 @@ public class RectangleManager : MonoBehaviour {
     }
 
 	/// <summary>
-	/// Создаёт новый прямоугольник, запускает процесс перемещения прямоугольника, чтобы сразу была возможность подстроить местоположение
+	/// Создаёт новый прямоугольник рандомного цвета, 
+    /// запускает процесс перемещения прямоугольника, чтобы сразу была возможность подстроить местоположение
+    /// Демонстрация умения писать норм комменты к методам
 	/// </summary>
 	/// <param name="cursorPosition">позиция курсора для создания прямоугольника</param>
 	void InstantiateNewRect(Vector2 cursorPosition)
 	{
-		if(!CanPlaceRect(cursorPosition) || onLinkCreation || mouseIsOnLink)
+		if(!CanPlaceRect(cursorPosition) || onLinkCreation || mouseIsOnLink) // запрет на создание прямоугольника во время других процессов
 			return;
-		if(rectsList.Count == 10)
+		if(rectsList.Count == 10) // кол-во прямоугольников не больше 10
 			return;
 		GameObject newRect = Instantiate(rect,new Vector2(cursorPosition.x, cursorPosition.y), Quaternion.identity);
 		newRect.GetComponent<SpriteRenderer>().color = new Color(Random.Range(0,1.0f), Random.Range(0,1.0f), Random.Range(0,1.0f));
 		rectsList.Add(newRect.GetComponent<Rectangle>());
-		currentRect = newRect.GetComponent<Rectangle>();
-		StartCoroutine(DragRectangle(currentRect.transform));
+		currentRect = newRect.GetComponent<Rectangle>(); // текущий прямоугольник - только что созданный прямоугольник
+		StartCoroutine(DragRectangle(currentRect.transform)); // тут же начинаем двигать прямоугольник для подстройки позиции сразу при создании
 	}
 
 	void RemoveRect()
@@ -99,11 +101,7 @@ public class RectangleManager : MonoBehaviour {
 		currentRect.DeleteRectangle();
 	}
 
-	Vector2 CursorPositionToWorld(Vector3 _cursorPosition)
-	{
-		return new Vector2(_cursorPosition.x, _cursorPosition.y);
-	}
-
+    // Проверка, не мешают ли ВСЕ прямоугольники создать новый в данной точке
 	bool CanPlaceRect(Vector2 anticipatedPosition)
 	{
 		foreach(Rectangle theRect in rectsList)
@@ -117,7 +115,7 @@ public class RectangleManager : MonoBehaviour {
 				return false;
 			}
 		}
-        return RectFitsCameraLimits(anticipatedPosition, rect.GetComponent<Renderer>().bounds);
+        return RectFitsCameraLimits(anticipatedPosition, rect.GetComponent<Renderer>().bounds); // финальная проверка на лимит камеры
 	}
 
     bool RectFitsCameraLimits(Vector2 anticipatedPos, Bounds rectBounds)
@@ -132,11 +130,12 @@ public class RectangleManager : MonoBehaviour {
 
     }
 
+    // Проверка, мешают ли прямоугольники движению текущего прямоугольника в новую позицию
 	bool CanMoveRect(Vector2 anticipatedPosition, Rectangle movingRect)
 	{
 		foreach(Rectangle theRect in rectsList)
 		{
-			if(theRect == movingRect)
+			if(theRect == movingRect) // исключение двигаемого прямоугольника из списка проверяемых прямоугольников
 				continue;
 			Bounds theRectBounds = theRect.bounds;
 			Vector2 vectorBetweenCenters = 
@@ -150,6 +149,7 @@ public class RectangleManager : MonoBehaviour {
 		return RectFitsCameraLimits(anticipatedPosition, rect.GetComponent<Renderer>().bounds);
     }
 
+    //проверка нахождения курсора над каким - либо прямоугольником, также определяем currentRect
 	bool CursorIsOnRect(Vector2 cursorPosition)
 	{
 		foreach(Rectangle theRect in rectsList)
@@ -158,7 +158,7 @@ public class RectangleManager : MonoBehaviour {
 
 			if(theRectBounds.Contains(cursorPosition))
 			{
-				currentRect = theRect.GetComponent<Rectangle>();
+				currentRect = theRect.GetComponent<Rectangle>(); // определяем ссылку на текущий прямоугольник и возвращаем true
 				return true;
 			}
 		}
@@ -166,54 +166,56 @@ public class RectangleManager : MonoBehaviour {
 		return false;
 	}
 
+    // процесс движения прямоугольника
 	IEnumerator DragRectangle(Transform rect)
 	{
 		onMove = true;
-		Vector2 clickOffset = (Vector2)rect.position - currentCursorPosition;
-		Vector2 lastApropriatePosition = currentCursorPosition;
-		while(Input.GetMouseButton(0))
+		Vector2 clickOffset = (Vector2)rect.position - currentCursorPosition; // смещение клика относительно центра прямоугольника
+		Vector2 lastApropriatePosition = currentCursorPosition; // инициализация последней пригодной для помещения пр-ка позиции
+		while(Input.GetMouseButton(0))// двигаем прямоугольник пока не держим ЛКМ
 		{
 			yield return null;
 			if(CanMoveRect(currentCursorPosition + clickOffset, rect.GetComponent<Rectangle>()))
 				lastApropriatePosition = currentCursorPosition + clickOffset;
-			rect.position = Vector3.Lerp(rect.position, lastApropriatePosition, Time.deltaTime * 25f);
-            rect.GetComponent<Rectangle>().UpdateLinks();
+			rect.position = Vector3.Lerp(rect.position, lastApropriatePosition, Time.deltaTime * 25f); //красивый Lerp
+            rect.GetComponent<Rectangle>().UpdateLinks(); // Обновляем позиции связей
         }
 		if(CanMoveRect(currentCursorPosition + clickOffset, rect.GetComponent<Rectangle>()))
-			rect.position = lastApropriatePosition;
-        rect.GetComponent<Rectangle>().UpdateLinks();
+			rect.position = lastApropriatePosition; // окончательно перемещаем прямоугольник в последнюю пригодную позицию
+        rect.GetComponent<Rectangle>().UpdateLinks(); // окончательно обновляем связи
         onMove = false;
 		yield break;
 	}
 
 	IEnumerator ProcessLinkCreation()
 	{
-		Rectangle startRect = currentRect.GetComponent<Rectangle>();
-		Link theLink = Instantiate(link, Vector3.zero, Quaternion.identity).GetComponent<Link>();
-		while(!Input.GetMouseButtonDown(1))
+		Rectangle startRect = currentRect.GetComponent<Rectangle>(); // ссылка на прямоугольник из которого получаем связь
+		Link theLink = Instantiate(link, Vector3.zero, Quaternion.identity).GetComponent<Link>(); // создаём связь
+		while(!Input.GetMouseButtonDown(1)) // перетаскиваем связь до тех пор пока не нажмём ПКМ второй раз
 		{
 			onLinkCreation = true;
 			theLink.UpdateLinkByVectors(Link.FindClosestCenterPoint(startRect.bounds, currentCursorPosition), currentCursorPosition);
 			yield return null;
 		}
 
-		if(currentRect != null)
+		if(currentRect != null) // нажали ли мы на прямоугольник?
 		{
-			if(currentRect.GetComponent<Rectangle>() != startRect)
-				AddNewLink(startRect, currentRect.GetComponent<Rectangle>(), theLink);
+			if(currentRect.GetComponent<Rectangle>() != startRect) // а не тот же ли это самый прямоугольник?
+				AddNewLink(startRect, currentRect.GetComponent<Rectangle>(), theLink); // норм, создаём связь
 			else
 				Destroy(theLink.gameObject);
 		}
 		else Destroy(theLink.gameObject);
 
-		while(!Input.GetMouseButtonUp(1))
+		while(!Input.GetMouseButtonUp(1)) // нужно для того, чтобы на втором прямоугольнике не запустился новый процесс создания связи
 		{
 			yield return null;
 		}
-		onLinkCreation = false;
+		onLinkCreation = false; // и только теперь мы не создаём связь, а значит можно обрабатывать 
 		yield break;
 	}
 
+    // Записываем в новую связь инфу о соединяемых ею прямоугольниках
 	void AddNewLink(Rectangle startRect, Rectangle endRect, Link theLink)
 	{
 		theLink.linkedRects[0] = startRect;
@@ -224,9 +226,10 @@ public class RectangleManager : MonoBehaviour {
 		theLink.UpdateLinkByRects();
 	}
 
+    // визуальная обработка курсора и всего, что за ним следует
 	void ManageCursor(Vector2 cursorPosition)
 	{
-		pointerRect.transform.position = cursorPosition;
+		pointerRect.transform.position = cursorPosition; // за курсором следует либо призрачный пр-к, показывающий как и где создастся новый
 
 		if(CursorIsOnRect(cursorPosition) || onMove)
 		{
